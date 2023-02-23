@@ -1,6 +1,6 @@
 # PowerDNS
 
-## Install PowerDNS on Ubuntu 20.40|18.04 / Debian 10|9
+## Install PowerDNS on Ubuntu 20.40|18.04 / Debian 11|10|9
 
 In this section we’re going to install and configure:
 * MariaDB database server.
@@ -15,34 +15,42 @@ For installation of MariaDB on Ubuntu / Debian Linux Server:
   sudo apt update
   sudo apt install mariadb-server -y
 ```
+
+Prepere the database server for production:
+```bash
+  sudo mysql_secure_installation
+```
+You should read and make a decision before answering. In my case the answers are: `n n Y Y Y Y`
+
+
 Once the database server is installed and running, proceed to create the PowerDNS Database and User Account in MariaDB.
 ```
-  $ sudo mysql -u root -p
+  $ sudo mysql
 ```
-``` 
+```SQL 
   CREATE DATABASE powerdns;
 ```
 Next is to create powerdns database user and assign privileges:
 On Mariadb:
-```
+```SQL
   GRANT ALL ON powerdns.* TO 'powerdns'@'localhost' IDENTIFIED BY 'Str0ngPasswOrd';
 ```
 On MySQL:
-```
+```SQL
 CREATE USER 'powerdns'@'localhost' IDENTIFIED BY 'Str0ngPasswOrd';
 GRANT ALL PRIVILEGES ON powerdns.* TO 'powerdns'@'localhost';
 ```
 Flush the privileges to update the user settings:
-```
+```SQL
   FLUSH PRIVILEGES;
 ```
 Switch to powerdns database to create tables:
-```
+```SQL
   USE powerdns;
 ```
 Create the required tables:
 
-```
+```SQL
 CREATE TABLE domains (
   id                    INT AUTO_INCREMENT,
   name                  VARCHAR(255) NOT NULL,
@@ -159,23 +167,23 @@ Step 2: Install PowerDNS on Ubuntu 20.04|18.04 / Debian 10|9
 Ubuntu 20.04|18.04 comes with systemd-resolve which you need to disable since it binds to port 53 which will conflict with PowerDNS ports.
 
 Run the following commands to disable the resolved service:
-```
+```bash
 sudo systemctl disable systemd-resolved
 sudo systemctl stop systemd-resolved
 ```
 
 Also, remove the symlinked resolv.conf file
-```
+```bash
 $ ls -lh /etc/resolv.conf 
 lrwxrwxrwx 1 root root 39 Jul 24 15:50 /etc/resolv.conf -> ../run/systemd/resolve/stub-resolv.conf
 $ sudo rm /etc/resolv.conf
 ```
 Then create new resolv.conf file.
-```
+```bash
 echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
 ```
 Note that you can install PowerDNS from the official apt repository or from PowerDNS repository. To install from apt repository, run:
-```
+```bash
 sudo apt update 
 sudo apt install pdns-server pdns-backend-mysql
 ```
@@ -201,30 +209,33 @@ sudo apt install pdns-server pdns-backend-mysql
 ```
 Install packages on Debian 10/9
 Add APT repository
-
-* Debian 10
+* Debian 11
+```bash
+echo "deb [arch=amd64] http://repo.powerdns.com/debian bullseye-auth-47 main" | sudo tee /etc/apt/sources.list.d/pdns.list && echo -e "Package: pdns-*\nPin: origin repo.powerdns.com\nPin-Priority: 600" | sudo tee /etc/apt/preferences.d/pdns && sudo apt install wget apt-transport-https gnupg2 -y && curl https://repo.powerdns.com/FD380FBB-pub.asc | sudo apt-key add -
 ```
+* Debian 10
+```bash
 echo "deb [arch=amd64] http://repo.powerdns.com/debian buster-auth-master main" | sudo tee /etc/apt/sources.list.d/pdns.list
 ```
 * Debian 9:
-```
+```bash
 echo "deb [arch=amd64] http://repo.powerdns.com/debian stretch-auth-master main" | sudo tee /etc/apt/sources.list.d/pdns.list
 ```
-* Import gpg key:
-```
+* Import gpg key: (Skip for Debian 11)
+```bash
 sudo apt install wget apt-transport-https gnupg2
 curl https://repo.powerdns.com/CBC8B383-pub.asc | sudo apt-key add -
 ```
-* Then install PowerDNS packages on Debian 10 / Debian 9:
-```
+* Then install PowerDNS packages on Debian 11 / Debian 10 / Debian 9:
+```bash
 sudo apt-get update
-sudo apt-get install pdns-server pdns-backend-mysql
+sudo apt-get install pdns-server pdns-backend-mysql -y
 ```
 * When asked whether to configure the PowerDNS database with dbconfig-common, answer No
 
 Configure PowerDNS to use MySQL backend:
 Here is my MySQL configuration for PowerDNS:
-```
+```bash
 $ sudo vim /etc/powerdns/pdns.d/pdns.local.gmysql.conf 
 # MySQL Configuration
 # Launch gmysql backend
@@ -238,15 +249,16 @@ gmysql-password=Str0ngPasswOrd
 gmysql-dnssec=yes
 # gmysql-socket=
 ```
+In case you do not have a IPv6, edit the file `/etc/powerdns/pdns.conf` set the `local-address` to `local-address=0.0.0.0` 
+
 Restart and enable the pdns service
-```
+```bash
 sudo systemctl restart pdns
 sudo systemctl enable pdns
 ```
 You can now test PowerDNS to confirm that the service is online:
 ```
-$ sudo apt install net-tools -y
-$ sudo netstat -tap | grep pdns
+$ sudo apt install net-tools -y && sudo netstat -tap | grep pdns
 tcp        0      0 0.0.0.0:domain          0.0.0.0:*               LISTEN      6211/pdns_server
 tcp6       0      0 [::]:domain             [::]:*                  LISTEN      6211/pdns_server   
 ```
@@ -295,26 +307,24 @@ Install Python 3 development package
 sudo apt-get install python3-dev
 ```
 Install required packages for building python libraries from requirements.txt file
-```
-sudo apt install -y libmysqlclient-dev libsasl2-dev libldap2-dev libssl-dev libxml2-dev libxslt1-dev libxmlsec1-dev libffi-dev pkg-config apt-transport-https virtualenv build-essential
+```bash
+sudo apt install -y default-libmysqlclient-dev libsasl2-dev libldap2-dev libssl-dev libxml2-dev libxslt1-dev libxmlsec1-dev libffi-dev pkg-config apt-transport-https virtualenv build-essential
 ```
 Install Node.js
-```
-curl -sL https://deb.nodesource.com/setup_14.x | bash -
-apt install -y nodejs
+```bash
+curl -sL https://deb.nodesource.com/setup_14.x | sudo bash -
+sudo apt install -y nodejs
 ```
 Install yarn to build asset files:
-```
-sudo curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+```bash
+curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
 echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-sudo apt update -y
+sudo apt update
 sudo apt install -y yarn
 ```
 Checkout source code and create virtualenv:
-```
-git clone https://github.com/PowerDNS-Admin/PowerDNS-Admin.git /opt/web/powerdns-admin
-cd /opt/web/powerdns-admin
-virtualenv -p python3 flask
+```bash
+sudo apt install git -y && sudo git clone https://github.com/PowerDNS-Admin/PowerDNS-Admin.git /opt/web/powerdns-admin && sudo chown $USER:$USER /opt/web/powerdns-admin && cd /opt/web/powerdns-admin && virtualenv -p python3 flask
 ```
 Output:
 ```
@@ -325,9 +335,8 @@ Also creating executable in /opt/web/powerdns-admin/flask/bin/python
 Installing setuptools, pkg_resources, pip, wheel...done.
 ```
 Activate your python3 environment and install libraries:
-```
-source ./flask/bin/activate
-pip install -r requirements.txt
+```bash
+source ./flask/bin/activate && pip install -r requirements.txt
 ```
 Before running PowerDNS-Admin, we need to configure database connectivity.
 ```
